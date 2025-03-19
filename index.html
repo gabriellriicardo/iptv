@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IPTV Stream Player</title>
+  <!-- Biblioteca HLS.js para fluxos HLS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.4.10/hls.min.js"></script>
+  <!-- Biblioteca mpegts.js para fluxos TS -->
+  <script src="https://cdn.jsdelivr.net/npm/mpegts.js/dist/mpegts.min.js"></script>
+  <style>
+    :root {
+      --primary-color: #8E44AD;
+      --secondary-color: #9B59B6;
+      --accent-color: #D2B4DE;
+      --dark-color: #2C3E50;
+      --light-color: #ECF0F1;
+      --success-color: #2ECC71;
+      --warning-color: #F39C12;
+      --danger-color: #E74C3C;
+      --category-bg: #3a3a3a;
+      --subcategory-bg: #444444;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    body {
+      background-color: #1a1a1a;
+      color: var(--light-color);
+      min-height: 100vh;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    
+    header {
+      background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+      padding: 20px 0;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      margin-bottom: 30px;
+      border-radius: 0 0 15px 15px;
+    }
+    
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+      color: white;
+    }
+    
+    .subtitle {
+      font-size: 1.2rem;
+      opacity: 0.8;
+      margin-bottom: 20px;
+    }
+    
+    .input-group {
+      display: flex;
+      margin-bottom: 30px;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    
+    #m3u-input {
+      flex-grow: 1;
+      padding: 15px;
+      border: none;
+      font-size: 16px;
+      outline: none;
+      background-color: #2a2a2a;
+      color: white;
+    }
+    
+    #m3u-input::placeholder {
+      color: #888;
+    }
+    
+    button {
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 15px 25px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+      transition: background-color 0.3s;
+    }
+    
+    button:hover {
+      background-color: var(--secondary-color);
+    }
+    
+    .player-section {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-bottom: 30px;
+    }
+    
+    .video-container {
+      flex: 1;
+      min-width: 300px;
+      background-color: #000;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+    }
+    
+    #video-player {
+      width: 100%;
+      height: 100%;
+      min-height: 400px;
+      background-color: #000;
+    }
+    
+    .player-info {
+      position: absolute;
+      bottom: 80px;
+      left: 0;
+      right: 0;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 8px 15px;
+      font-size: 14px;
+      z-index: 10;
+      display: none;
+    }
+    
+    .channels-container {
+      flex: 0 0 350px;
+      background-color: #2a2a2a;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+      max-height: 600px;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .channels-header {
+      padding: 15px;
+      background-color: var(--dark-color);
+      border-bottom: 1px solid #444;
+    }
+    
+    .content-tabs {
+      display: flex;
+      background-color: var(--dark-color);
+      border-bottom: 1px solid #444;
+    }
+    
+    .content-tab {
+      flex: 1;
+      text-align: center;
+      padding: 12px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      font-weight: bold;
+    }
+    
+    .content-tab:hover {
+      background-color: #3a3a3a;
+    }
+    
+    .content-tab.active {
+      background-color: var(--primary-color);
+      color: white;
+    }
+    
+    .channels-content {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    
+    .tab-content {
+      display: none;
+      flex-grow: 1;
+      overflow: hidden;
+      flex-direction: column;
+    }
+    
+    .tab-content.active {
+      display: flex;
+    }
+    
+    .category-list {
+      list-style: none;
+      overflow-y: auto;
+      flex-grow: 1;
+    }
+    
+    .category-item {
+      border-bottom: 1px solid #444;
+    }
+    
+    .category-header {
+      padding: 12px 15px;
+      background-color: var(--category-bg);
+      cursor: pointer;
+      font-weight: bold;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .category-header:hover {
+      background-color: #444;
+    }
+    
+    .category-toggle {
+      font-size: 18px;
+      transition: transform 0.3s;
+    }
+    
+    .category-toggle.open {
+      transform: rotate(90deg);
+    }
+    
+    .channel-list {
+      display: none;
+      list-style: none;
+      background-color: #505050;
+    }
+    
+    .channel-list.open {
+      display: block;
+    }
+    
+    .channel-item {
+      padding: 8px 15px;
+      cursor: pointer;
+      border-bottom: 1px solid #666;
+      transition: background-color 0.2s;
+    }
+    
+    .channel-item:hover {
+      background-color: #666;
+    }
+    
+    .channel-item.active {
+      background-color: var(--primary-color);
+    }
+    
+    /* Estilos para logo e EPG */
+    .channel-logo {
+      width: 30px;
+      height: auto;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    .channel-title {
+      font-weight: bold;
+      vertical-align: middle;
+    }
+    .channel-epg {
+      font-size: 12px;
+      color: #ccc;
+      margin-top: 4px;
+    }
+    
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 15px 20px;
+      border-radius: 8px;
+      color: white;
+      font-weight: bold;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      display: none;
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    
+    .notification.success {
+      background-color: var(--success-color);
+    }
+    
+    .notification.error {
+      background-color: var(--danger-color);
+    }
+    
+    .notification.active {
+      display: block;
+      opacity: 1;
+    }
+    
+    .loading {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.7);
+      z-index: 999;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .loading-spinner {
+      border: 5px solid #f3f3f3;
+      border-top: 5px solid var(--primary-color);
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .instructions {
+      background-color: #2a2a2a;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 30px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    
+    .instructions h3 {
+      margin-bottom: 10px;
+      color: var(--accent-color);
+    }
+    
+    .instructions p {
+      margin-bottom: 10px;
+      line-height: 1.6;
+    }
+    
+    footer {
+      text-align: center;
+      padding: 20px;
+      margin-top: 40px;
+      border-top: 1px solid #444;
+      color: #888;
+    }
+    
+    .search-container {
+      padding: 10px 15px;
+      background-color: #333;
+    }
+    
+    #channel-search {
+      width: 100%;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 4px;
+      background-color: #444;
+      color: white;
+    }
+    
+    #channel-search::placeholder {
+      color: #888;
+    }
+    
+    .channel-count {
+      font-size: 0.9rem;
+      color: #888;
+      margin-top: 5px;
+    }
+    
+    .no-channels {
+      padding: 20px;
+      text-align: center;
+      color: #888;
+    }
+    
+    .video-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 5;
+    }
+    
+    .video-message {
+      color: white;
+      font-size: 18px;
+      text-align: center;
+      padding: 20px;
+      background-color: rgba(0, 0, 0, 0.7);
+      border-radius: 8px;
+    }
+    
+    .player-controls {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      z-index: 10;
+    }
+    
+    .player-button {
+      background-color: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: white;
+      padding: 8px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    
+    .player-button:hover {
+      background-color: rgba(255, 255, 255, 0.3);
+    }
+    
+    @media (max-width: 768px) {
+      .player-section {
+        flex-direction: column;
+      }
+      
+      .channels-container {
+        max-height: 400px;
+      }
+      
+      #video-player {
+        min-height: 250px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="loading">
+    <div class="loading-spinner"></div>
+    <p>Carregando canais...</p>
+  </div>
+
+  <header>
+    <div class="container">
+      <h1>IPTV Stream Player</h1>
+      <p class="subtitle">Assista a seus canais IPTV favoritos em um só lugar</p>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="instructions">
+      <h3>Como usar:</h3>
+      <p>1. Cole o link da sua lista M3U no campo abaixo (ex: http://exemplo.com/playlist.m3u)</p>
+      <p>2. Clique em "Carregar Canais" para importar a lista de canais</p>
+      <p>3. Navegue pelas categorias (TV, Filmes, Séries) e selecione um canal para assistir</p>
+    </div>
+
+    <div class="input-group">
+      <input type="text" id="m3u-input" placeholder="Cole seu link M3U aqui (ex: http://exemplo.com/playlist.m3u)">
+      <button id="load-button">Carregar Canais</button>
+    </div>
+
+    <div class="player-section">
+      <div class="video-container">
+        <video id="video-player" controls></video>
+        <div class="player-info" id="player-info"></div>
+        <div class="video-overlay" id="video-overlay">
+          <div class="video-message">
+            Selecione um canal para começar a assistir
+          </div>
+        </div>
+      </div>
+      
+      <div class="channels-container">
+        <div class="channels-header">
+          <h3>Conteúdo</h3>
+          <div class="channel-count" id="channel-count">0 canais encontrados</div>
+        </div>
+        <div class="search-container">
+          <input type="text" id="channel-search" placeholder="Buscar canais...">
+        </div>
+        <div class="content-tabs">
+          <div class="content-tab active" data-tab="tv">TV</div>
+          <div class="content-tab" data-tab="movies">Filmes</div>
+          <div class="content-tab" data-tab="series">Séries</div>
+        </div>
+        <div class="channels-content">
+          <div class="tab-content active" id="tv-content">
+            <ul class="category-list" id="tv-categories">
+              <li class="no-channels">Cole um link M3U e clique em "Carregar Canais"</li>
+            </ul>
+          </div>
+          <div class="tab-content" id="movies-content">
+            <ul class="category-list" id="movies-categories">
+              <li class="no-channels">Cole um link M3U e clique em "Carregar Canais"</li>
+            </ul>
+          </div>
+          <div class="tab-content" id="series-content">
+            <ul class="category-list" id="series-categories">
+              <li class="no-channels">Cole um link M3U e clique em "Carregar Canais"</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notification" id="notification"></div>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2025 IPTV Stream Player - Seu player IPTV personalizado</p>
+    </div>
+  </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const m3uInput = document.getElementById('m3u-input');
+      const loadButton = document.getElementById('load-button');
+      const videoPlayer = document.getElementById('video-player');
+      const notification = document.getElementById('notification');
+      const loading = document.querySelector('.loading');
+      const channelCount = document.getElementById('channel-count');
+      const channelSearch = document.getElementById('channel-search');
+      const videoOverlay = document.getElementById('video-overlay');
+      const playerInfo = document.getElementById('player-info');
+      
+      const tvCategories = document.getElementById('tv-categories');
+      const moviesCategories = document.getElementById('movies-categories');
+      const seriesCategories = document.getElementById('series-categories');
+      
+      const contentTabs = document.querySelectorAll('.content-tab');
+      const tabContents = document.querySelectorAll('.tab-content');
+      
+      let allChannels = [];
+      let categorizedChannels = {
+        tv: {},
+        movies: {},
+        series: {}
+      };
+      
+      let hls = null;
+      let mpegtsPlayer = null;
+      let currentChannel = null;
+      
+      function isHlsSupported() {
+        return Hls.isSupported();
+      }
+      
+      function showLoading(isLoading) {
+        loading.style.display = isLoading ? 'flex' : 'none';
+      }
+      
+      function showNotification(message, type) {
+        notification.textContent = message;
+        notification.className = 'notification ' + type + ' active';
+        setTimeout(() => {
+          notification.classList.remove('active');
+        }, 3000);
+      }
+      
+      contentTabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+          contentTabs.forEach(t => t.classList.remove('active'));
+          tabContents.forEach(c => c.classList.remove('active'));
+          this.classList.add('active');
+          const tabId = this.getAttribute('data-tab');
+          document.getElementById(`${tabId}-content`).classList.add('active');
+        });
+      });
+      
+      // Função para parse da lista M3U (agora também extrai tvg-epg)
+      async function parseM3U(url) {
+        try {
+          showLoading(true);
+          const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error(`Falha ao carregar a playlist: ${response.statusText}`);
+          }
+          const data = await response.text();
+          const lines = data.split('\n');
+          const channels = [];
+          let currentChannel = null;
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (line.startsWith('#EXTINF:')) {
+              const titleMatch = line.match(/tvg-name="([^"]*)"/) || line.match(/,(.*)$/);
+              const logoMatch = line.match(/tvg-logo="([^"]*)"/);
+              const groupMatch = line.match(/group-title="([^"]*)"/);
+              const epgMatch = line.match(/tvg-epg="([^"]*)"/);
+              currentChannel = {
+                title: titleMatch ? titleMatch[1].trim() : 'Canal sem nome',
+                logo: logoMatch ? logoMatch[1] : null,
+                group: groupMatch ? groupMatch[1] : 'Sem categoria',
+                epg: epgMatch ? epgMatch[1] : null
+              };
+            } else if (line.length > 0 && !line.startsWith('#') && currentChannel) {
+              currentChannel.url = line;
+              channels.push(currentChannel);
+              currentChannel = null;
+            }
+          }
+          return channels;
+        } catch (error) {
+          showNotification(error.message, 'error');
+          console.error('Error parsing M3U:', error);
+          return [];
+        } finally {
+          showLoading(false);
+        }
+      }
+      
+      function categorizeChannels(channels) {
+        allChannels = channels;
+        categorizedChannels = {
+          tv: {},
+          movies: {},
+          series: {}
+        };
+        const movieKeywords = ['filme', 'movie', 'cinema', '24h', 'hd', 'full', 'acção', 'ação', 'comedia', 'drama', 'terror'];
+        const seriesKeywords = ['serie', 'series', 'show', 'tv show', 'sitcom', 'temporada', 'episodio'];
+        channels.forEach(channel => {
+          const lowerTitle = channel.title.toLowerCase();
+          const lowerGroup = channel.group.toLowerCase();
+          let mainCategory = 'tv';
+          if (
+            movieKeywords.some(keyword => lowerTitle.includes(keyword)) || 
+            movieKeywords.some(keyword => lowerGroup.includes(keyword)) ||
+            lowerGroup.includes('filme') ||
+            lowerGroup.includes('vod')
+          ) {
+            mainCategory = 'movies';
+          } else if (
+            seriesKeywords.some(keyword => lowerTitle.includes(keyword)) || 
+            seriesKeywords.some(keyword => lowerGroup.includes(keyword)) ||
+            lowerGroup.includes('serie')
+          ) {
+            mainCategory = 'series';
+          }
+          let subcategory = determineSubcategory(channel, mainCategory);
+          if (!categorizedChannels[mainCategory][subcategory]) {
+            categorizedChannels[mainCategory][subcategory] = [];
+          }
+          categorizedChannels[mainCategory][subcategory].push(channel);
+        });
+        return channels.length;
+      }
+      
+      function determineSubcategory(channel, mainCategory) {
+        const lowerTitle = channel.title.toLowerCase();
+        const lowerGroup = channel.group.toLowerCase();
+        if (channel.group && channel.group !== 'Sem categoria' && !['all', 'todos', 'vod'].includes(lowerGroup)) {
+          return channel.group;
+        }
+        if (mainCategory === 'movies') {
+          if (lowerTitle.includes('ação') || lowerTitle.includes('action')) return 'Ação';
+          if (lowerTitle.includes('comédia') || lowerTitle.includes('comedy')) return 'Comédia';
+          if (lowerTitle.includes('drama')) return 'Drama';
+          if (lowerTitle.includes('terror') || lowerTitle.includes('horror')) return 'Terror';
+          if (lowerTitle.includes('romance')) return 'Romance';
+          if (lowerTitle.includes('animação') || lowerTitle.includes('animation')) return 'Animação';
+          if (lowerTitle.includes('documentário') || lowerTitle.includes('documentary')) return 'Documentários';
+          return 'Outros Filmes';
+        }
+        if (mainCategory === 'series') {
+          if (lowerTitle.includes('ação') || lowerTitle.includes('action')) return 'Ação';
+          if (lowerTitle.includes('comédia') || lowerTitle.includes('comedy')) return 'Comédia';
+          if (lowerTitle.includes('drama')) return 'Drama';
+          if (lowerTitle.includes('animação') || lowerTitle.includes('animation')) return 'Animação';
+          return 'Outras Séries';
+        }
+        if (lowerTitle.includes('br') || lowerTitle.includes('brazil') || lowerTitle.includes('brasil')) return 'Brasil';
+        if (lowerTitle.includes('pt') || lowerTitle.includes('portugal')) return 'Portugal';
+        if (lowerTitle.includes('news') || lowerTitle.includes('notícia')) return 'Notícias';
+        if (lowerTitle.includes('sport') || lowerTitle.includes('esporte')) return 'Esportes';
+        if (lowerTitle.includes('docum')) return 'Documentários';
+        if (lowerTitle.includes('kids') || lowerTitle.includes('infantil') || lowerTitle.includes('criança')) return 'Infantil';
+        if (lowerTitle.includes('music') || lowerTitle.includes('música')) return 'Música';
+        return 'Canais Gerais';
+      }
+      
+      function displayCategorizedChannels() {
+        tvCategories.innerHTML = '';
+        moviesCategories.innerHTML = '';
+        seriesCategories.innerHTML = '';
+        
+        let totalChannels = 0;
+        function renderCategory(categoryName, channels, container) {
+          if (!channels || channels.length === 0) return;
+          totalChannels += channels.length;
+          const categoryLi = document.createElement('li');
+          categoryLi.className = 'category-item';
+          const categoryHeader = document.createElement('div');
+          categoryHeader.className = 'category-header';
+          categoryHeader.innerHTML = `
+            ${categoryName} <span class="channel-count">(${channels.length})</span>
+            <span class="category-toggle">›</span>
+          `;
+          const channelList = document.createElement('ul');
+          channelList.className = 'channel-list';
+          channels.forEach(channel => {
+            const channelLi = document.createElement('li');
+            channelLi.className = 'channel-item';
+            // Cria o conteúdo com logo, título e EPG (se disponível)
+            channelLi.innerHTML = `
+              ${channel.logo ? `<img src="${channel.logo}" alt="${channel.title}" class="channel-logo">` : ''}
+              <span class="channel-title">${channel.title}</span>
+              ${channel.epg ? `<div class="channel-epg">${channel.epg}</div>` : ''}
+            `;
+            channelLi.addEventListener('click', function() {
+              document.querySelectorAll('.channel-item').forEach(item => {
+                item.classList.remove('active');
+              });
+              channelLi.classList.add('active');
+              loadChannel(channel);
+            });
+            channelList.appendChild(channelLi);
+          });
+          categoryHeader.addEventListener('click', function() {
+            const toggle = this.querySelector('.category-toggle');
+            toggle.classList.toggle('open');
+            channelList.classList.toggle('open');
+          });
+          categoryLi.appendChild(categoryHeader);
+          categoryLi.appendChild(channelList);
+          container.appendChild(categoryLi);
+        }
+        
+        for (const [categoryName, channels] of Object.entries(categorizedChannels.tv)) {
+          renderCategory(categoryName, channels, tvCategories);
+        }
+        for (const [categoryName, channels] of Object.entries(categorizedChannels.movies)) {
+          renderCategory(categoryName, channels, moviesCategories);
+        }
+        for (const [categoryName, channels] of Object.entries(categorizedChannels.series)) {
+          renderCategory(categoryName, channels, seriesCategories);
+        }
+        channelCount.textContent = `${totalChannels} canais encontrados`;
+        if (tvCategories.children.length === 0) {
+          tvCategories.innerHTML = '<li class="no-channels">Nenhum canal de TV encontrado</li>';
+        }
+        if (moviesCategories.children.length === 0) {
+          moviesCategories.innerHTML = '<li class="no-channels">Nenhum filme encontrado</li>';
+        }
+        if (seriesCategories.children.length === 0) {
+          seriesCategories.innerHTML = '<li class="no-channels">Nenhuma série encontrada</li>';
+        }
+      }
+      
+      function loadChannel(channel) {
+        currentChannel = channel;
+        videoOverlay.style.display = 'none';
+        // Exibe também o EPG (caso exista) na área do player
+        playerInfo.innerHTML = `Reproduzindo: ${channel.title}` + (channel.epg ? `<br><small>${channel.epg}</small>` : '');
+        playerInfo.style.display = 'block';
+        
+        // Destrói instâncias anteriores, se houver
+        if (hls) {
+          hls.destroy();
+          hls = null;
+        }
+        if (mpegtsPlayer) {
+          mpegtsPlayer.destroy();
+          mpegtsPlayer = null;
+        }
+        
+        // Se a URL termina com ".ts" e mpegts.js estiver suportado, use mpegts.js
+        if (channel.url.endsWith('.ts') && mpegts.isSupported()) {
+          mpegtsPlayer = mpegts.createPlayer({
+            type: 'mpegts',
+            url: channel.url,
+            isLive: true
+          });
+          mpegtsPlayer.attachMediaElement(videoPlayer);
+          mpegtsPlayer.load();
+          mpegtsPlayer.play().catch(error => {
+            console.error('Erro ao reproduzir via mpegts.js:', error);
+            showNotification('Falha ao reproduzir o canal (mpegts). Tente outro canal.', 'error');
+          });
+        }
+        // Se for HLS (.m3u8) e Hls.js estiver suportado, use Hls.js
+        else if(channel.url.includes('.m3u8') && Hls.isSupported()){
+          hls = new Hls({
+            enableWorker: true,
+            lowLatencyMode: true,
+            backBufferLength: 90
+          });
+          hls.loadSource(channel.url);
+          hls.attachMedia(videoPlayer);
+          hls.on(Hls.Events.MANIFEST_PARSED, function() {
+            setTimeout(() => {
+              videoPlayer.play().catch(error => {
+                console.error('Erro ao reproduzir o vídeo:', error);
+                showNotification('Falha ao reproduzir o canal. Tente outro canal.', 'error');
+              });
+            }, 300);
+          });
+          hls.on(Hls.Events.ERROR, function(event, data) {
+            if (data.fatal) {
+              console.error('Erro HLS:', data);
+              showNotification('Erro ao carregar o canal. Tente outro canal.', 'error');
+              videoOverlay.style.display = 'flex';
+              videoOverlay.querySelector('.video-message').textContent = 'Não foi possível reproduzir este canal. Por favor, escolha outro.';
+            }
+          });
+        }
+        // Fallback para reprodução nativa (ex: Safari)
+        else if(videoPlayer.canPlayType('application/vnd.apple.mpegurl')){
+          videoPlayer.src = channel.url;
+          videoPlayer.addEventListener('loadedmetadata', function() {
+            videoPlayer.play().catch(error => {
+              console.error('Erro ao reproduzir o vídeo:', error);
+              showNotification('Falha ao reproduzir o canal. Tente outro canal.', 'error');
+            });
+          });
+        }
+        else {
+          showNotification('Seu navegador não suporta HLS.', 'error');
+        }
+      }
+      
+      loadButton.addEventListener('click', async function() {
+        const url = m3uInput.value.trim();
+        if (!url) {
+          showNotification("Por favor, insira um link M3U.", "error");
+          return;
+        }
+        const channels = await parseM3U(url);
+        if(channels.length > 0) {
+          categorizeChannels(channels);
+          displayCategorizedChannels();
+          showNotification("Canais carregados com sucesso.", "success");
+        } else {
+          showNotification("Nenhum canal encontrado.", "error");
+        }
+      });
+      
+      channelSearch.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+        document.querySelectorAll('.channel-item').forEach(item => {
+          if (item.textContent.toLowerCase().includes(searchTerm)) {
+            item.style.display = 'block';
+          } else {
+            item.style.display = 'none';
+          }
+        });
+      });
+    });
+  </script>
+</body>
+</html>
